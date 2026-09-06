@@ -3,28 +3,77 @@
 Huge thanks to everyone who supports and contributes to the **Cremniy** project.
 Your time, ideas, and effort help the project grow and move forward.
 
----
+> [!TIP]
+> Want to contribute? Check out our [contribution guidelines](CONTRIBUTING.md) or open a pull request!
+> 
+> Want to financially support the project? Check out our donation page and donate [here](https://dalink.to/igmunv)!
+
+### Thanks everyone ❤️
 
 ## 👥 Contributors
 
 People who contributed their time and code to Cremniy.
 
-| Contributor | GitHub |
-|---|---|
-| mansar1337 | [@mansar1337](https://github.com/mansar1337) |
-| Pawmii | [@Pawmii](https://github.com/Pawmii) |
-| mystergaif | [@mystergaif](https://github.com/mystergaif) |
-| Artem Romancuk | [@teenageswag](https://github.com/teenageswag) |
-| Nikita Ivin | [@Keqy](https://github.com/Keqy) |
-| Altro-O | [@Altro-O](https://github.com/Altro-O) |
-| Kirill | [@KaVoshnik](https://github.com/KaVoshnik) |
-| Marcus | [@encryrose](https://github.com/encryrose) |
+<a href="https://github.com/munirov/cremniy/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=munirov/cremniy" />
+</a>
+
 ---
+
+[@teenageswag](https://github.com/teenageswag)
+
+[@Altro-O](https://github.com/Altro-O)
+
+[@ewasion137](https://github.com/ewasion137)
+
+[@faketri33](https://github.com/faketri33)
+
+[@Kleshzz](https://github.com/Kleshzz)
+
+[@mansar1337](https://github.com/mansar1337)
+
+[@encryrose](https://github.com/encryrose)
+
+[@zylo-code](https://github.com/zylo-code)
+
+[@mystergaif](https://github.com/mystergaif)
+
+[@niki-gor](https://github.com/niki-gor)
+
+[@Alexandr153](https://github.com/Alexandr153)
+
+[@irekgab](https://github.com/irekgab)
+
+[@KaVoshnik](https://github.com/KaVoshnik)
+
+[@lovlygod](https://github.com/lovlygod)
+
+[@alexcircuits](https://github.com/alexcircuits)
+
+[@Keqy](https://github.com/Keqy)
+
+[@Pawmii](https://github.com/Pawmii)
+
+[@Anstrofonik](https://github.com/Anstrofonik)
+
+[@AlexeyTolstopyatov](https://github.com/AlexeyTolstopyatov)
+
+[@Maksim-Sebelev](https://github.com/Maksim-Sebelev)
+
+[@cluedesc](https://github.com/cluedesc)
+
+[@zaedalbal](https://github.com/zaedalbal)
 
 ## 💸 Donators
 
 People who financially supported the development of Cremniy.
 
----
+[alexandr-seredkin](https://github.com/alexandr-seredkin)
 
-> Want to contribute? Check out our [contribution guidelines](CONTRIBUTING.md) or open a pull request!
+NeXxRT
+
+Vordeferst_company
+
+Тапки в кедах
+
+[AlexseyPip](https://github.com/AlexseyPip)

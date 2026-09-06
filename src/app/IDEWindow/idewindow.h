@@ -1,64 +1,72 @@
 #ifndef IDEWINDOW_H
 #define IDEWINDOW_H
 
-#include "filestabwidget.h"
-#include "filetreeview.h"
+#include "core/modules/ModuleManager.h"
+#include "ui/FilesTabWidget/filestabwidget.h"
+#include "widgets/filetreepanel.h"
+#include "core/settings/exclusionfilterproxymodel.h"
 #include <QMainWindow>
 #include <qboxlayout.h>
-#include <qmenubar.h>
 #include <qsplitter.h>
 #include <qstatusbar.h>
-#include "widgets/terminal/terminalwidget.h"
+#include <QLabel>
+#include "project_info_manager.h"
 
-class IDEWindow : public QMainWindow
-{
+class TerminalPanel;
+
+class SearchPanel;
+class QShortcut;
+
+class IDEWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit IDEWindow(QString ProjectPath, QWidget *parent = nullptr);
+    explicit IDEWindow(const QString &ProjectPath, QWidget *parent = nullptr);
     ~IDEWindow() override;
-
-private slots:
-
-    /**
-     * @brief Двойной клик
-     *
-     * Обрабатывает открытие файла или разворачивание директории
-    */
-    void on_treeView_doubleClicked(const QModelIndex &index);
-
-    /**
-     * @brief Открытие контекстного меню
-     *
-     * Нужен при клике на ПКМ для открытия контекстного меню
-    */
-    void on_Tree_ContextMenu(const QPoint &pos);
-
+    bool gitBlameEnabled() const;
 
 private:
+    FileTab* currentFileTab() const;
+    void showSearch(SearchScope scope, bool replaceMode);
+    void configurateBuild();
+    void openBuildConfigurate();
 
-    /**
-     * @brief Сохранить текущий путь проекта в истории
-    */
-    void SaveProjectInCache(const QString project_path);
+    // - - Project Info - -
+    ProjectInfo m_projectInfo;
 
     // - - Main Widgets - -
     QMenuBar* m_menuBar;
     QStatusBar* m_statusBar;
+    QLabel* m_statusLabel;
     QWidget* m_mainWidget;
     QHBoxLayout* m_mainLayout;
     QSplitter* m_verticalSplitter;  // splitter (вверх вниз)
-    QSplitter* m_mainSplitter; 
+    QSplitter* m_mainSplitter;
 
     // - - General Widgets - -
-    FilesTabWidget* m_filesTabWidget;
-    FileTreeView* m_filesTreeView;
+    FilesTabWidget* m_filesTabWidget = nullptr;
+
+    // - - Sidebar Widgets - -
+    QWidget* m_leftSidebar;
+    FileTreePanel* m_filesTreeView;
 
     // - - Terminal Widget - -
-    TerminalWidget* m_terminal;
-
+    TerminalPanel *m_terminalPanel;
+    SearchPanel* m_searchPanel;
+    QShortcut* m_closeSearchShortcut;
+    QString m_projectPath;
 
 public slots:
+
+    /**
+     * @brief Собрать текущий проект (QMenuBar->Build->Build)
+    */
+    void on_Build();
+
+    /**
+     * @brief Открыть конфигурацию сборки (QMenuBar->Build->Configurate)
+    */
+    void on_openBuildConfigurate();
 
     /**
      * @brief Создать новый проект (QMenuBar->File->NewProject)
@@ -86,6 +94,10 @@ public slots:
      * Открывает окно Settings
     */
     void on_openSettings();
+    void on_Find();
+    void on_FindOpenFiles();
+    void on_FindInProject();
+    void on_Replace();
 
     /**
      * @brief Отображение терминала
@@ -107,8 +119,25 @@ public slots:
      */
     void on_SetTabWidth(int width);
 
+    /** @brief Route the Git blame command to modules through TabBase. */
+    void on_SetGitBlame(bool enabled);
+
+    /**
+     * @brief Отображение дерева файлов
+    */
+    void on_Toggle_FileTree(bool checked) const;
+
 signals:
     void saveFileSignal();
+    void CloseProject();
+    void terminalVisibilityChanged(bool visible);
 
+    void setWordWrapSignal(bool checked);
+    void setTabReplaceSignal(bool checked);
+    void setTabWidthSignal(int width);
+    void setGitBlameSignal(bool enabled);
+    void gitBlameEnabledChanged(bool enabled);
+
+    void openTabModule(ModuleDescription<TabBase> desc);
 };
 #endif // IDEWINDOW_H

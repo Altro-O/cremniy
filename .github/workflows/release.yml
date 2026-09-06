@@ -1,46 +1,131 @@
 name: Build and Release
 
 on:
+
   push:
     tags:
       - 'v*.*.*'
+      
   workflow_dispatch:
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  RELEASE_VERSION: ${{ github.ref_name || 'manual' }}
+
+permissions:
+  contents: read
 
 jobs:
+
+
+
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            artifact_name: cremniy-linux
-          - os: windows-latest
-            artifact_name: cremniy-windows
-          - os: macos-latest
-            artifact_name: cremniy-macos
+        os: [ubuntu-22.04, windows-latest, macos-latest]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+      - name: configure Pagefile
+        if: runner.os == 'Windows'
+        uses: al-cheb/configure-pagefile-action@v1.5
         with:
-          version: '6.5.3'
-          cache: false
+          minimum-size: 8GB
+          disk-root: "D:"
+
+      - name: Set up Swap Space
+        if: runner.os == 'Linux'
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 8
+    
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install Qt (Windows)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
+          arch: 'win64_msvc2022_64'
+          cache: true
+
+      - name: Set up MSVC Developer Command Prompt
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Install Qt (Linux/macOS)
+        if: runner.os != 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.9.2'
+          cache: true
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0 libfuse2 file imagemagick
-          
+          sudo apt-get install -y \
+            libgl1-mesa-dev libxkbcommon-x11-0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0 \
+            libxcb-xkb1 libdbus-1-3 \
+            libfuse2 file imagemagick librsvg2-bin
+
+      - name: Cache vcpkg binary archives (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-archives-linux-libgit2-v1
+          restore-keys: |
+            vcpkg-archives-linux-
+
+      - name: Cache vcpkg binary archives (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
+          key: vcpkg-archives-windows-libgit2-v1
+          restore-keys: |
+            vcpkg-archives-windows-
+
+      - name: Cache vcpkg binary archives (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/cache@v4
+        with:
+          path: ~/vcpkg/archives
+          key: vcpkg-archives-macos-libgit2-v1
+          restore-keys: |
+            vcpkg-archives-macos-
+
+      - name: Setup vcpkg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install libgit2
+
+      - name: Setup vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          .\vcpkg\bootstrap-vcpkg.bat
+          .\vcpkg\vcpkg install libgit2:x64-windows
+
+      - name: Setup vcpkg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install libgit2
+
       - name: Download linuxdeploy tools
         if: runner.os == 'Linux'
         run: |
@@ -49,84 +134,237 @@ jobs:
           chmod +x linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-plugin-qt-x86_64.AppImage
 
-      - name: Configure CMake
-        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release -G "Ninja" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
 
-      - name: Build
-        run: cmake --build build --config Release
+      - name: Configure CMake (macOS)
+        if: runner.os == 'macOS'
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release -G "Unix Makefiles" -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
-      - name: Package (Linux) - tar.gz
+      - name: Configure CMake (Linux)
         if: runner.os == 'Linux'
-        run: |
-          mkdir -p package
-          cp build/cremniy package/
-          cd package
-          tar -czf ../${{ matrix.artifact_name }}.tar.gz *
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+
           
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
       - name: Package (Linux) - AppImage
         if: runner.os == 'Linux'
         run: |
-          # Resize icon to 256x256 for AppImage compatibility
-          convert src/resources/icons/icon.png -resize 256x256 cremniy.png
-          
+          echo -e "[Desktop Entry]\nType=Application\nName=Cremniy\nExec=cremniy\nIcon=cremniy\nCategories=Utility;" > cremniy.desktop
+
+          rsvg-convert src/resources/icons/icon.svg -w 256 -h 256 -o cremniy.png
+
           export QML_SOURCES_PATHS=${{ github.workspace }}/src
-          export QMAKE=$Qt6_DIR/bin/qmake
-          ./linuxdeploy-x86_64.AppImage \
+
+          ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
             --appdir AppDir \
             --executable build/cremniy \
             --desktop-file cremniy.desktop \
             --icon-file cremniy.png \
             --plugin qt \
             --output appimage
-          mv Cremniy-*.AppImage ${{ matrix.artifact_name }}.AppImage || mv cremniy-*.AppImage ${{ matrix.artifact_name }}.AppImage
+          mv Cremniy-*.AppImage cremniy-linux-${{ env.RELEASE_VERSION }}.AppImage || mv cremniy-*.AppImage cremniy-linux-${{ env.RELEASE_VERSION }}.AppImage
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Path package -Force
-          Copy-Item build/Release/cremniy.exe package/
-          windeployqt package/cremniy.exe
-          Compress-Archive -Path package/* -DestinationPath ${{ matrix.artifact_name }}.zip
+      
+          if (!(Test-Path "build/cremniy.exe")) {
+            throw "build/cremniy.exe was not produced"
+          }
+      
+          Copy-Item build/cremniy.exe package/
+      
+          # Copy runtime DLL's
+          $vcpkgBin = "vcpkg/installed/x64-windows/bin"
 
+          if (!(Test-Path $vcpkgBin)) {
+            throw "vcpkg bin directory was not found: $vcpkgBin"
+          }
+          
+          Copy-Item "$vcpkgBin/*.dll" package/
+      
+          # Translations
+          New-Item -ItemType Directory -Path "package/Resources/translations" -Force
+          Copy-Item build/*.qm "package/Resources/translations/"
+      
+          # Qt dependencies
+          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" `
+            --release `
+            --no-translations `
+            package\cremniy.exe
+      
+          Compress-Archive `
+            -Path package/* `
+            -DestinationPath cremniy-windows-${{ env.RELEASE_VERSION }}.zip
+
+      - name: Install create-dmg
+        if: runner.os == 'macOS'
+        run: brew install create-dmg
+
+      - name: Deploy Qt
+        if: runner.os == 'macOS'
+        run: |
+          macdeployqt \
+            build/cremniy.app \
+            -verbose=2
+
+      - name: Verify macOS bundle
+        if: runner.os == 'macOS'
+        run: |
+          echo "=== Frameworks ==="
+          find build/cremniy.app/Contents/Frameworks \
+            -maxdepth 2 \
+            -type f \
+            -print
+
+          echo "=== Dependencies ==="
+          otool -L build/cremniy.app/Contents/MacOS/cremniy
+
+          echo "=== RPATH ==="
+          otool -l build/cremniy.app/Contents/MacOS/cremniy | grep -A3 LC_RPATH
+
+      - name: Compile Asset Catalog
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p car_output
+      
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
           mkdir -p package
-          cp -r build/cremniy.app package/
-          macdeployqt package/cremniy.app
-          cd package
-          tar -czf ../${{ matrix.artifact_name }}.tar.gz *
+          cp -a build/cremniy.app package/Cremniy.app
 
+          codesign --force --deep -s - package/Cremniy.app
+
+          create-dmg \
+            --volname "Cremniy" \
+            --background "src/resources/macos/background-dmg.png" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Cremniy.app" 175 190 \
+            --hide-extension "Cremniy.app" \
+            --app-drop-link 425 190 \
+            "cremniy-macos-${{ env.RELEASE_VERSION }}.dmg" \
+            "package/"
+          
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact_name }}
+          name: cremniy-${{ runner.os }}-${{ env.RELEASE_VERSION }}
           path: |
-            ${{ matrix.artifact_name }}.tar.gz
-            ${{ matrix.artifact_name }}.zip
-            ${{ matrix.artifact_name }}.AppImage
+            cremniy-linux-${{ env.RELEASE_VERSION }}.AppImage
+            cremniy-windows-${{ env.RELEASE_VERSION }}.zip
+            cremniy-macos-${{ env.RELEASE_VERSION }}.dmg
+          if-no-files-found: error
+
+
+
+  build-rpm:
+    name: Build RPM (Fedora)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:41
+
+    steps:
+      - name: Install git (required before checkout)
+        run: dnf install -y git tar
+        
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          dnf install -y \
+            rpm-build rpmdevtools git tar rsync \
+            cmake gcc-c++ \
+            qt6-qtbase-devel qt6-qttools-devel qt6-qtsvg-devel \
+            desktop-file-utils \
+            libgit2-devel \
+            http-parser-devel
+
+      - name: Setup rpmbuild tree
+        run: rpmdev-setuptree
+        
+      - name: Sync spec version with tag
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^Version:.*/Version:        ${TAG_VERSION}/" rpm/cremniy.spec
+          echo "version=${TAG_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Build source tarball
+        run: |
+          STAGE_DIR="$(mktemp -d)/cremniy"
+          mkdir -p "$STAGE_DIR"
+          rsync -a --exclude='.git' ./ "$STAGE_DIR/"
+          tar -C "$(dirname "$STAGE_DIR")" -czf \
+            "$HOME/rpmbuild/SOURCES/cremniy-${{ env.version }}.tar.gz" cremniy
+
+      - name: Copy spec file
+        run: cp rpm/cremniy.spec "$HOME/rpmbuild/SPECS/"
+
+      - name: Build RPM
+        run: |
+            echo '%debug_package %{nil}' >> ~/.rpmmacros
+            rpmbuild -bb "$HOME/rpmbuild/SPECS/cremniy.spec"
+
+      - name: Rename RPMs for clarity
+        run: |
+          mkdir -p dist
+          find "$HOME/rpmbuild/RPMS" -name '*.rpm' -exec cp {} dist/ \;
+          find "$HOME/rpmbuild/SRPMS" -name '*.rpm' -exec cp {} dist/ \;
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: cremniy-rpm-${{ env.RELEASE_VERSION }}
+          path: dist/*.rpm
+          if-no-files-found: error
+
+
 
   release:
     name: Create Release
-    needs: build
+    needs:
+      - build
+      - build-rpm
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch'
     permissions:
       contents: write
-    
+
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/**/*.tar.gz
             artifacts/**/*.zip
             artifacts/**/*.AppImage
+            artifacts/**/*.dmg
+            artifacts/**/*.rpm
           draft: false
           prerelease: false
           generate_release_notes: true

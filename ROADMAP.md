@@ -1,41 +1,19 @@
+<div align="center">
+
+English • [Русский](ROADMAP_ru.md)
+	
+</div>
+
 # 🚀 Roadmap
 
-## 🎯 Цель проекта
-Создать **единый инструмент для системного программирования**, устраняющий необходимость использования разрозненных решений и упрощающий процесс разработки
+## 🎯 Project Goal
+Create a **unified tool for system programming** that eliminates the need for scattered solutions and simplifies the development process.
 
-## 📦 Текущая версия
-[v0.1.1](https://github.com/igmunv/cremniy/releases/tag/v0.1.1) — базовая среда разработки с:
-- редактором кода (полный набор низкоуровневых языков)
-- HEX-редактором (просмотр байтов в RAW формате)
-- дизассемблером (может использовать `objdump` и `radare2`)
-- калькулятором для преобразования в разные системы счисления
+## ✨ Tasks
 
-## 🛠 Ближайшие задачи
+All tasks can be found in [**GitHub Projects**](https://github.com/orgs/munirov/projects/2/views/1)
 
-- [ ] [Баг: Неправильное отображение байтов в HEX-Editor на MacOS](https://github.com/igmunv/cremniy/issues/43)
-- [ ] [Баг: Не правильно работает синтаксис Makefile](https://github.com/igmunv/cremniy/issues/41)
-- [ ] [Баг: Отображение полоски в HEX-Editor на Windows](https://github.com/igmunv/cremniy/issues/33)
-
-<br>
-
-- [ ] [Реализация кастомного QPlainText для Code Editor](https://github.com/igmunv/cremniy/issues/56)
-- [ ] [Оптимизировать хранение данных у QHexView](https://github.com/igmunv/cremniy/issues/57)
-- [ ] [Улучшение дизайна Disassembler](https://github.com/igmunv/cremniy/issues/55)
-- [ ] [Основы базовой архитектуры для обеспечения расширяемости](https://github.com/igmunv/cremniy/issues/29)
-- [ ] [Сборка и запуск проекта пользователя](https://github.com/igmunv/cremniy/issues/6)
-- [ ] [Отображение чисел в разных системах счисления при наведении](https://github.com/igmunv/cremniy/issues/28)
-- [ ] [Работа с Git](https://github.com/igmunv/cremniy/issues/42)
-- [ ] [Модуль контекстной помощи по инструкциям процессора](https://github.com/igmunv/cremniy/issues/21)
-- [x] [Реализовать связанные представления для байтов, инструкций и кода](https://github.com/igmunv/cremniy/issues/47)
-- [x] [Поиск строки в коде](https://github.com/igmunv/cremniy/issues/27)
-- [x] [Терминал](https://github.com/igmunv/cremniy/issues/31)
-- [x] [Вкладки форматов в HEX-редакторе](https://github.com/igmunv/cremniy/issues/13)
-- [x] [Добавить поддержку языков](https://github.com/igmunv/cremniy/issues/4)
-
-## 🔮 Будущие планы
-
-### v0.2.0
-
-- [ ] Расширяемая архитектура
-- [ ] Отладчик
-- [ ] Просмотр памяти
+> [!WARNING]
+> If you would like to take on a task, please leave a comment on the corresponding [Issue](https://github.com/munirov/cremniy/issues). This helps prevent duplicate work.
+>
+> Additionally, once you submit a Pull Request, reference the corresponding [Issue](https://github.com/munirov/cremniy/issues) in the PR description using `Closes #ISSUE_NUMBER`.

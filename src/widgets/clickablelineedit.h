@@ -2,26 +2,34 @@
 #define CLICKABLELINEEDIT_H
 
 #include <QLineEdit>
+#include <QDir>
+#include <QMouseEvent>
 #include <qfiledialog.h>
 
 class ClickableLineEdit : public QLineEdit {
     Q_OBJECT
 public:
-    explicit ClickableLineEdit();
+    explicit ClickableLineEdit() {};
     using QLineEdit::QLineEdit;
+
+signals:
+    void clicked();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override {
-        // Здесь будем вызывать FIleDialog и полученное значение из диалога подставлять в Text данного виждета
-        QString dir = QFileDialog::getExistingDirectory(
-            this,
-            "Choose Directory",
-            QDir::homePath(),
-            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
-            );
+        emit clicked();
 
-        if (!dir.isEmpty()) {
-            this->setText(dir);
+        if (receivers(SIGNAL(clicked())) == 0) {
+            QString dir = QFileDialog::getExistingDirectory(
+                this,
+                tr("Choose Directory"),
+                QDir::homePath(),
+                QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+                );
+
+            if (!dir.isEmpty()) {
+                this->setText(dir);
+            }
         }
 
         QLineEdit::mousePressEvent(event);

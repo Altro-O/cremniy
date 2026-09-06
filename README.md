@@ -1,68 +1,56 @@
 <div align="center">
 
-<img src="src/resources/icons/icon.png" width="250" alt="Cremniy logo">
+<img src="docs/assets/cremniy_icon_stroke.svg" width="250" alt="Cremniy logo">
 
 <br>
 <h3>Cremniy</h3>
-<h6>A development environment for low-level programming that combines all low-level tools into a single application</h6>
+<h6>All tools for low-level development are combined and linked in a single application — write code, edit bytes, and analyze binaries without extra windows</h6>
 
 [![License](https://img.shields.io/github/license/igmunv/cremniy?color=orange&style=flat-square)](LICENSE)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 [![Community](https://img.shields.io/badge/Community-Telegram-blue?logo=telegram&style=flat-square)](https://t.me/cremniy_com)
 <br>
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue?style=flat-square&logo=cplusplus)](https://en.cppreference.com/w/cpp/17)
-[![Qt 6](https://img.shields.io/badge/Qt-6.x-41CD52?style=flat-square&logo=qt)](https://www.qt.io/)
+[![Qt 6](https://img.shields.io/badge/Qt-6.8.2-41CD52?style=flat-square&logo=qt)](https://www.qt.io/)
 
 English • [Русский](README_ru.md)
 
 </div>
 
----
+<br>
 
 ## What is Cremniy?
 
-**Cremniy** is an integrated environment for low-level development. Instead of juggling a hex editor here, a disassembler there, and a code editor somewhere else — you get them all in one consistent, focused application.
+**Cremniy** is an integrated environment for low-level development. Instead of keeping a HEX editor in one window, a disassembler in another, and a code editor in a third — all tools are combined and linked in a single convenient application.
 
-**Built for:**
+**Designed for:**
 
 - 🛠 System software developers
 - 🔍 Reverse engineers
-- 🔐 Information security specialists
+- 🔐 Cybersecurity specialists
 - 📡 Embedded systems developers
 
----
+## Why Cremniy?
 
-## Screenshots
+Low-level development today means using a code editor, HEX editor, disassembler, debugger, all opened **in separate windows**.
 
-<div align="center">
+You constantly **switch** between different windows, and the tools are **not linked** together.
 
-### Code Editor
-<img src="screenshots/code.png" alt="Code Editor" width="800">
-<br>
+#### **Cremniy solves this!**
+- 🔘 Everything is in one place
+- 🔗 All tools are connected
+- 💻 Unified workflow
 
-### Disassembler
-<img src="screenshots/dasm.png" alt="Disassembler" width="800">
-<br>
+<img src="docs/assets/features.gif" alt="Features" width="1280">
 
-### HEX Editor
-<img src="screenshots/hex.png" alt="HEX Editor" width="800">
-<br>
-
-### Other
-<img src="screenshots/revcalc.png" alt="HEX Editor" width="800">
-<br>
-</div>
-
----
-
-## Features
+## Features ✨
 
 ### Available now
 
 | Feature | Description |
 |---|---|
 | 📝 Code editor | Write and edit low-level code with syntax support |
-| 🔢 HEX editor | Inspect and modify binary data at the byte level |
+| 🔢 HEX editor | Inspect and modify binary data at the byte level (patching) |
 | 🔧 Disassembler | Decode machine instructions into readable assembly |
 
 ### Coming soon
@@ -70,25 +58,41 @@ English • [Русский](README_ru.md)
 - 🐛 **Debugger** — step through execution, inspect registers and memory
 - 🧠 **Memory visualization** — visual maps of memory layout and allocation
 
----
+## Contributing 👋
 
-## Getting Started
+Contributions are **welcome and encouraged**.
+
+Whether it's a bug fix, a new feature, or an improvement to documentation — feel free to open an issue or submit a pull request.
+
+All tasks can be found in [**GitHub Projects**](https://github.com/orgs/munirov/projects/2/views/1).
+
+All contributors are credited in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) and mentioned in videos on the [YouTube channel](https://www.youtube.com/@igmunv).
+
+For guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+> [!WARNING]
+> If you would like to take on a task, please leave a comment on the corresponding [Issue](https://github.com/munirov/cremniy/issues). This helps prevent duplicate work.
+>
+> Additionally, once you submit a Pull Request, reference the corresponding [Issue](https://github.com/munirov/cremniy/issues) in the PR description using `Closes #ISSUE_NUMBER`.
+
+## Build 🛠️
 
 ### Prerequisites
 
 | Dependency | Minimum version |
 |---|---|
-| **CMake** | 3.16 |
-| **Qt** | 6.x |
-| **C++ compiler** | C++17 support |
+| **[CMake](https://cmake.org/download/)** | 3.16 |
+| **[Qt](https://www.qt.io/development/download-qt-installer-oss)** | 6.8.2 |
+| **[libgit2](https://libgit2.org/)** | 1.x |
+| **C++ compiler** | C++17 compliant |
 
 <details>
 <summary><b>🪟 Windows</b></summary>
 
 1. Install [MSYS2](https://www.msys2.org/)
-2. Install MinGW, CMake, Qt6-base via **MSYS2 terminal**:
+2. Install MinGW, CMake, Qt6-base, and libgit2 via **MSYS2 terminal**:
 ```base
-pacman -S --needed base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-qt6-base
+pacman -S --needed base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-libgit2
 ```
 3. Add MSYS2 package directory to PATH  
    MSYS2 packages are located in `C:\msys64\ucrt64\bin` by default.
@@ -96,14 +100,20 @@ pacman -S --needed base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86
 </details>
 
 <details>
-<summary><b>🐧 Linux (Ubuntu / Debian)</b></summary>
+<summary><b>🐧 Linux (Debian-based / Fedora)</b></summary>
 
+For Debian-based distributions:
 ```bash
 sudo apt update
-sudo apt install cmake g++ qt6-base-dev
+sudo apt install cmake g++ qt6-base-dev qt6-svg-dev qt6-tools-dev-tools libgit2-dev zlib1g-dev libssl-dev libpcre2-dev libhttp-parser-dev
+```
+For Fedora:
+```bash
+sudo dnf update --refresh
+sudo dnf install cmake gcc-c++ qt6-qtbase-devel qt6-qtsvg-devel qt6-qttools-devel libgit2-devel zlib-devel openssl-devel pcre2-devel http-parser-devel
 ```
 
-> [!NOTE]
+> ℹ️ **NOTE:** 
 > If `qt6-base-dev` is unavailable in your distribution's repositories, use the [official Qt installer](https://www.qt.io/download-qt-installer-oss) instead.
 
 </details>
@@ -114,14 +124,12 @@ sudo apt install cmake g++ qt6-base-dev
 Using [Homebrew](https://brew.sh/):
 
 ```bash
-brew install cmake qt@6
+brew install cmake qt@6 libgit2
 ```
 
 </details>
 
----
-
-## Build in Linux
+### Build in Linux
 
 ```bash
 git clone https://github.com/igmunv/cremniy.git
@@ -132,18 +140,14 @@ cmake ../src
 cmake --build .
 ```
 
-### Release build
+#### Release build
 
 ```bash
 cmake ../src -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ```
 
-## Build in Windows
-
-### Install Windows [prerequisites](#prerequisites)
-
-### Build Cremniy
+### Build in Windows
 
 ```bash
 git clone https://github.com/igmunv/cremniy.git
@@ -155,27 +159,13 @@ cmake --build .
 
 ```
 
-### Release build
+#### Release build
 
 ```bash
 cmake ..\src -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ```
 
----
-
-## Contributing
-
-Contributions are **welcome and encouraged**.
-
-Whether it's a bug fix, a new feature, or an improvement to documentation — feel free to open an issue or submit a pull request.
-
-All contributors are credited in [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) and mentioned in videos on the [YouTube channel](https://www.youtube.com/@igmunv).
-
-For guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-## License
+## License 📖
 
 Distributed under the terms described in [LICENSE](LICENSE).

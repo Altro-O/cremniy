@@ -1,98 +1,98 @@
 #include "idewindow.h"
-#include "dialogs/filecreatedialog.h"
 #include "QFileSystemModel"
 #include "QMessageBox"
 #include <qheaderview.h>
 #include <qjsondocument.h>
 #include <qjsonobject.h>
-#include <QStandardPaths>
 #include <QApplication>
-#include "app/WelcomeWindow/welcomeform.h"
+#include "dialogs/configurebuild.h"
 #include "dialogs/settingsdialog.h"
 #include "ui/MenuBar/menubarbuilder.h"
-#include "widgets/CustomCodeEditor.h"
+#include "widgets/search/searchpanel.h"
+#include "widgets/terminal/terminalpanel.h"
+#include <QShortcut>
+#include <qtimer.h>
 
-IDEWindow::IDEWindow(QString ProjectPath, QWidget *parent)
-    : QMainWindow(parent)
-{
-
+IDEWindow::IDEWindow(const QString &ProjectPath, QWidget *parent)
+    : QMainWindow(parent), m_projectPath(ProjectPath) {
+    setProperty("projectPath", ProjectPath);
     // - - Window Settings - -
     this->setWindowState(Qt::WindowMaximized);
     this->setWindowTitle("Cremniy");
+    setMinimumSize(800, 600);
 
     // - - Menu Bar - -
-    MenuBarBuilder* menuBarBuilder = new MenuBarBuilder(menuBar(), this);
+    auto const menu = menuBar();
+    MenuBarBuilder menuBarBuilder(menu, this);
+    menu->setNativeMenuBar(false);
 
-    // Save Project In History
-    SaveProjectInCache(ProjectPath);
+    // - - Get Project Info - -
+    if (!ProjectInfoManager::loadProjectInfo(ProjectPath, m_projectInfo)){
+        QString dirName = QDir(ProjectPath).dirName();
+        m_projectInfo.name = dirName;
+        m_projectInfo.path = ProjectPath;
+        ProjectInfoManager::saveProjectInfo(m_projectInfo);
+    }
 
     // - - Widgets - -
     m_statusBar = statusBar();
+    m_statusLabel = new QLabel(this);
+    m_statusBar->addPermanentWidget(m_statusLabel);
 
     m_mainWidget = new QWidget(this);
     m_mainLayout = new QHBoxLayout(m_mainWidget);
-    m_mainLayout->setContentsMargins(0,0,0,0);
+    m_mainLayout->setContentsMargins(0, 0, 0, 0);
 
     m_mainSplitter = new QSplitter(Qt::Horizontal, m_mainWidget);
 
     m_verticalSplitter = new QSplitter(Qt::Vertical, m_mainWidget);
 
-    m_terminal = new TerminalWidget(this);
+    m_terminalPanel = nullptr;
 
-    QWidget* leftWidget = new QWidget();
-    QVBoxLayout* leftLayout = new QVBoxLayout(leftWidget);
-    leftLayout->setContentsMargins(0,0,0,0);
-    
-    m_filesTabWidget = new FilesTabWidget();
+    m_leftSidebar = new QWidget(this);
+    auto const leftLayout = new QVBoxLayout(m_leftSidebar);
+
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+
+    m_filesTabWidget = new FilesTabWidget(this);
     m_filesTabWidget->setObjectName("filesTabWidget");
-    m_filesTreeView = new FileTreeView();
-    leftLayout->addWidget(m_filesTreeView);
 
-    m_mainSplitter->addWidget(leftWidget);
+    const auto model = new QFileSystemModel();
+    const auto proxy = new ExclusionFilterProxyModel();
+
+    m_filesTreeView = new FileTreePanel(this, model, proxy, ProjectPath);
+    leftLayout->addWidget(m_filesTreeView, 1);
+
+    m_mainSplitter->addWidget(m_leftSidebar);
     m_mainSplitter->addWidget(m_filesTabWidget);
-    m_mainSplitter->setSizes({200, 1000});
+    m_searchPanel = new SearchPanel(ProjectPath, m_filesTabWidget, m_mainSplitter);
+    m_mainSplitter->addWidget(m_searchPanel);
+    m_searchPanel->hide();
+    m_mainSplitter->setSizes({200, 1000, 0});
+    m_mainSplitter->setStretchFactor(0, 0);
+    m_mainSplitter->setStretchFactor(1, 1);
+    m_mainSplitter->setStretchFactor(2, 0);
 
     m_verticalSplitter->addWidget(m_mainSplitter); // Сверху все наше IDE
-    m_verticalSplitter->addWidget(m_terminal);     // Снизу терминал
-    m_verticalSplitter->setSizes({800, 200});      // пр
+    m_verticalSplitter->setSizes({800, 200});
 
     m_mainLayout->addWidget(m_verticalSplitter);
     setCentralWidget(m_mainWidget);
 
-    leftLayout->addWidget(m_filesTreeView);
 
     // - - Tunning Widgets/Layouts - -
-
-    setCentralWidget(m_mainWidget);
-
-    m_mainLayout->addWidget(m_verticalSplitter);
-
-    m_mainSplitter->setSizes({200, 1000});
+    m_mainSplitter->setSizes({200, 1000, 0});
     m_mainSplitter->setCollapsible(0, false);
     m_mainSplitter->setCollapsible(1, false);
+    m_mainSplitter->setCollapsible(2, true);
 
     m_verticalSplitter->setSizes({800, 200});
-    m_verticalSplitter->setCollapsible(1, true);
 
-    m_filesTreeView->setMinimumWidth(180);
-    m_filesTreeView->setTextElideMode(Qt::ElideNone);
-    m_filesTreeView->setIndentation(12);
+    if (m_verticalSplitter->count() > 1) {
+        m_verticalSplitter->setCollapsible(1, true);
+    }
 
-    QFileSystemModel *model = new QFileSystemModel(this);
-    model->setRootPath(ProjectPath);
-    model->setReadOnly(false);
-    m_filesTreeView->setModel(model);
-    m_filesTreeView->setRootIndex(model->index(ProjectPath));
-
-    m_filesTreeView->setColumnHidden(1, true);
-    m_filesTreeView->setColumnHidden(2, true);
-    m_filesTreeView->setColumnHidden(3, true);
-    m_filesTreeView->header()->hide();
-    m_filesTreeView->setAnimated(true);
-    m_filesTreeView->setEditTriggers(QAbstractItemView::EditKeyPressed);
-    m_filesTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
-
-    m_mainLayout->setContentsMargins(0,0,0,0);
+    m_mainLayout->setContentsMargins(0, 0, 0, 0);
 
     while (m_filesTabWidget->count() > 0) {
         m_filesTabWidget->removeTab(0);
@@ -105,212 +105,205 @@ IDEWindow::IDEWindow(QString ProjectPath, QWidget *parent)
 
     connect(this, &IDEWindow::saveFileSignal, m_filesTabWidget, &FilesTabWidget::saveFileSlot);
 
-    connect(m_filesTabWidget, &QTabWidget::tabCloseRequested,
-            this, [=](int index){
-                m_filesTabWidget->removeTab(index);
-            });
-    connect(m_filesTreeView, &QTreeView::customContextMenuRequested,this, &IDEWindow::on_Tree_ContextMenu);
-    connect(m_filesTreeView, &QTreeView::doubleClicked, this, &IDEWindow::on_treeView_doubleClicked);
+    connect(m_filesTabWidget, &FilesTabWidget::statusBarInfoChanged,this, [this](const QString &info) {
+        m_statusLabel->setText(info);
+    });
+
+    connect(m_filesTabWidget, &QTabWidget::tabCloseRequested, m_filesTabWidget, &FilesTabWidget::closeTab);
+    connect(this, &IDEWindow::setWordWrapSignal, m_filesTabWidget, &FilesTabWidget::setWordWrapSlot);
+    connect(this, &IDEWindow::setTabReplaceSignal, m_filesTabWidget, &FilesTabWidget::setTabReplaceSlot);
+    connect(this, &IDEWindow::setTabWidthSignal, m_filesTabWidget, &FilesTabWidget::setTabWidthSlot);
+    connect(this, &IDEWindow::setGitBlameSignal, m_filesTabWidget, &FilesTabWidget::setGitBlameSlot);
+    connect(m_filesTabWidget, &FilesTabWidget::gitBlameEnabledChanged,
+            this, &IDEWindow::gitBlameEnabledChanged);
+    connect(this, &IDEWindow::openTabModule, m_filesTabWidget, &FilesTabWidget::openTabModule);
+
+    connect(m_filesTreeView, &FileTreePanel::openFileRequested, this, [this](const QString& filePath, const QString& fileName) {
+            m_filesTabWidget->openFile(filePath, fileName);
+    });
+    m_closeSearchShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    m_closeSearchShortcut->setContext(Qt::WindowShortcut);
+    m_closeSearchShortcut->setEnabled(false);
+    const auto closeSearch = [this] {
+        m_searchPanel->hide();
+        m_closeSearchShortcut->setEnabled(false);
+        if (auto* tab = currentFileTab())
+            tab->setFocus(Qt::ShortcutFocusReason);
+    };
+    connect(m_searchPanel, &SearchPanel::closeRequested, this, closeSearch);
+    connect(m_closeSearchShortcut, &QShortcut::activated, this, closeSearch);
+
+    auto* nextSearchResult = new QShortcut(QKeySequence(Qt::Key_F3), this);
+    nextSearchResult->setContext(Qt::WindowShortcut);
+    connect(nextSearchResult, &QShortcut::activated, this, [this] {
+        if (m_searchPanel->isVisible())
+            m_searchPanel->nextResult();
+        else
+            on_Find();
+    });
+    auto* previousSearchResult = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F3), this);
+    previousSearchResult->setContext(Qt::WindowShortcut);
+    connect(previousSearchResult, &QShortcut::activated, this, [this] {
+        if (m_searchPanel->isVisible())
+            m_searchPanel->previousResult();
+        else
+            on_Find();
+    });
+    connect(m_searchPanel, &SearchPanel::statusMessage, this, [this](const QString& message) {
+        m_statusLabel->setText(message);
+    });
+
+    // - - Configure Build - -
+    QTimer::singleShot(0, this, &IDEWindow::configurateBuild);
+
 }
 
-IDEWindow::~IDEWindow()
-{}
+IDEWindow::~IDEWindow() = default;
+
+bool IDEWindow::gitBlameEnabled() const
+{
+    return m_filesTabWidget && m_filesTabWidget->gitBlameEnabled();
+}
+
+void IDEWindow::configurateBuild(){
+
+    if (m_projectInfo.buildCommand.trimmed().isEmpty()){
+        openBuildConfigurate();
+    }
+
+}
+
+
+void IDEWindow::openBuildConfigurate(){
+
+    ConfigureBuild confBuildDialog(m_projectInfo, this);
+    if (confBuildDialog.exec() == QDialog::Accepted) {
+        ProjectInfoManager::saveProjectInfo(m_projectInfo);
+    }
+
+}
+
+
+void IDEWindow::on_Build(){
+    m_filesTabWidget->createBuildTab(m_projectInfo);
+}
+
+
+void IDEWindow::on_openBuildConfigurate(){
+    openBuildConfigurate();
+}
+
 
 void IDEWindow::on_Toggle_Terminal(bool checked) {
-    m_terminal->setVisible(checked);
+    if (checked && !m_terminalPanel) {
+        auto *panel = new TerminalPanel(m_projectPath, this);
+        m_terminalPanel = panel;
+        m_verticalSplitter->addWidget(panel);
+        m_verticalSplitter->setCollapsible(1, true);
+        m_verticalSplitter->setSizes({800, 200});
+
+        connect(panel, &TerminalPanel::closeRequested, this, [this, panel] {
+            if (m_terminalPanel != panel)
+                return;
+
+            m_terminalPanel = nullptr;
+            panel->hide();
+            panel->deleteLater();
+            emit terminalVisibilityChanged(false);
+
+            if (auto *tab = currentFileTab())
+                tab->setFocus(Qt::ShortcutFocusReason);
+        });
+    }
+
+    if (!m_terminalPanel) {
+        emit terminalVisibilityChanged(false);
+        return;
+    }
+
+    m_terminalPanel->setVisible(checked);
+    emit terminalVisibilityChanged(checked);
+
+    if (checked) {
+        m_terminalPanel->focusActiveTerminal();
+    }
 }
 
-void IDEWindow::on_SetWordWrap(bool checked)
+void IDEWindow::on_SetWordWrap(bool checked) {
+    emit setWordWrapSignal(checked);
+}
+
+void IDEWindow::on_SetTabReplace(bool checked) {
+    emit setTabReplaceSignal(checked);
+}
+
+void IDEWindow::on_SetTabWidth(int width) {
+    emit setTabWidthSignal(width);
+}
+
+void IDEWindow::on_SetGitBlame(bool enabled)
 {
-    const auto editors = findChildren<CustomCodeEditor*>();
-    for (CustomCodeEditor* editor : editors) {
-        if (editor)
-            editor->setWordWrapEnabled(checked);
-    }
+    emit setGitBlameSignal(enabled);
 }
 
-void IDEWindow::on_SetTabReplace(bool checked)
-{
-    const auto editors = findChildren<CustomCodeEditor*>();
-    for (CustomCodeEditor* editor : editors) {
-        if (editor)
-            editor->setTabReplace(checked);
-    }
-}
-
-void IDEWindow::on_SetTabWidth(int width)
-{
-    const auto editors = findChildren<CustomCodeEditor*>();
-    for (CustomCodeEditor* editor : editors) {
-        if (editor)
-            editor->setTabDisplaySize(width);
-    }
-}
-
-void IDEWindow::SaveProjectInCache(const QString project_path){
-    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir(dataDir).mkpath(".");
-    QFile history_file(dataDir+"/"+"history_open_projects.dat");
-    QStringList lines;
-    if (history_file.open(QIODevice::ReadOnly)) {
-        QByteArray data = history_file.readAll();
-        QString text = QString::fromUtf8(data);
-        lines = text.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
-        history_file.close();
-    }
-    lines.removeAll(project_path);
-    lines.prepend(project_path);
-    while (lines.size() > 15)
-        lines.removeLast();
-    if (!history_file.open(QIODevice::WriteOnly | QIODevice::Text)) return;
-    QTextStream out(&history_file);
-    for (const QString& l : lines){
-        if (!QDir(l).exists()) continue;
-        out << l << "\n";
-    }
-
-    history_file.close();
+void IDEWindow::on_Toggle_FileTree(bool checked) const {
+    m_leftSidebar->setVisible(checked);
 }
 
 void IDEWindow::on_ClosingProject() {
-    WelcomeForm* wForm = new WelcomeForm();
-    wForm->show();
-
+    emit CloseProject();
     this->close();
-    this->deleteLater();
 }
 
-void IDEWindow::on_treeView_doubleClicked(const QModelIndex &index)
-{
-    auto *model = static_cast<QFileSystemModel*>(m_filesTreeView->model());
-    if (model->isDir(index)) return;
-    QString fileName = model->fileName(index);
-    QString filePath = model->filePath(index);
-
-    m_filesTabWidget->openFile(filePath, fileName);
-
+void IDEWindow::on_NewProject() {
 }
 
-void IDEWindow::on_Tree_ContextMenu(const QPoint &pos)
-{
-    QModelIndex index = m_filesTreeView->indexAt(pos); // индекс под курсором
-
-    QFileSystemModel *model = qobject_cast<QFileSystemModel*>(m_filesTreeView->model());
-    if (!model)
-        return;
-
-    QMenu menu(this);
-
-    if (index.isValid()){
-
-        QString path = model->filePath(index);
-        QString fileName = model->fileName(index);
-        bool isDir = model->isDir(index);  // <-- проверяем, директория ли
-
-        if (isDir){
-            menu.addAction("Open", [this, path]() {
-                QFileSystemModel *model = qobject_cast<QFileSystemModel*>(m_filesTreeView->model());
-                if (!model)
-                    return;
-
-                QModelIndex index = model->index(path);
-                if (!index.isValid())
-                    return;
-
-                // Разворачиваем саму директорию
-                m_filesTreeView->expand(index);
-
-                // Прокручиваем и выделяем
-                //m_filesTreeView->scrollTo(index);
-                //m_filesTreeView->setCurrentIndex(index);
-                //m_filesTreeView->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
-
-            });
-
-            menu.addAction("Rename", [this, path]() {
-                QFileSystemModel *model = qobject_cast<QFileSystemModel*>(m_filesTreeView->model());
-                if (!model)
-                    return;
-
-                QModelIndex index = model->index(path);
-                if (!index.isValid())
-                    return;
-
-                // Включаем редактирование индекса
-                m_filesTreeView->edit(index);
-            });
-            menu.addAction("Delete", [path, this]() {
-                QDir dir(path);
-                QString dialogTitle = QString("Are you sure you want to delete the folder \"%1\"?").arg(dir.dirName());
-                auto res = QMessageBox::question(this, "Delete", dialogTitle, QMessageBox::Ok | QMessageBox::Cancel);
-                if (res == QMessageBox::Ok) dir.removeRecursively();
-            });
-            menu.addSeparator();
-            menu.addAction("Create File", [path,this]() {
-                FileCreateDialog fcd(this,path,false);
-                fcd.exec();
-
-            });
-            menu.addAction("Create Folder", [path,this]() {
-                FileCreateDialog fcd(this,path,true);
-                fcd.exec();
-            });
-        }
-        else{
-            menu.addAction("Open", [this, path, fileName]() {
-                m_filesTabWidget->openFile(path, fileName);
-            });
-            menu.addAction("Rename", [this, path]() {
-                QFileSystemModel *model = qobject_cast<QFileSystemModel*>(m_filesTreeView->model());
-                if (!model)
-                    return;
-
-                QModelIndex index = model->index(path);
-                if (!index.isValid())
-                    return;
-
-                // Включаем редактирование индекса
-                m_filesTreeView->edit(index);
-            });
-            menu.addAction("Delete", [path,this]() {
-                QString dialogTitle = QString("Are you sure you want to delete the file \"%1\"?").arg(QFileInfo(path).fileName());
-                auto res = QMessageBox::question(this, "Delete", dialogTitle, QMessageBox::Ok | QMessageBox::Cancel);
-                if (res == QMessageBox::Ok) QFile(path).remove();
-            });
-        }
-
-        // Показать меню в глобальных координатах
-
-    }
-
-    else{
-        QString path = model->rootPath();
-        menu.addAction("Create File", [path,this]() {
-            FileCreateDialog fcd(this,path,false);
-            fcd.exec();
-        });
-        menu.addAction("Create Folder", [path,this]() {
-            FileCreateDialog fcd(this,path,true);
-            fcd.exec();
-        });
-    }
-    menu.exec(m_filesTreeView->viewport()->mapToGlobal(pos));
+void IDEWindow::on_OpenProject() {
 }
 
-void IDEWindow::on_NewProject(){
-
-}
-
-void IDEWindow::on_OpenProject(){
-
-}
-
-void IDEWindow::on_SaveFile(){
+void IDEWindow::on_SaveFile() {
     qDebug() << "IDEWindow::on_SaveFile()";
     emit saveFileSignal();
 }
 
-void IDEWindow::on_openSettings(){
+void IDEWindow::on_openSettings() {
     SettingsDialog dlg(this);
     dlg.exec();
+}
+
+FileTab* IDEWindow::currentFileTab() const
+{
+    return qobject_cast<FileTab*>(m_filesTabWidget->currentWidget());
+}
+
+void IDEWindow::showSearch(SearchScope scope, bool replaceMode)
+{
+    m_searchPanel->show();
+    m_closeSearchShortcut->setEnabled(true);
+    const int totalWidth = qMax(1, m_mainSplitter->width());
+    const int sidebarWidth = qMax(180, m_leftSidebar->width());
+    const int panelWidth = qBound(360, totalWidth / 3, 480);
+    const int editorWidth = qMax(320, totalWidth - sidebarWidth - panelWidth);
+    m_mainSplitter->setSizes({sidebarWidth, editorWidth, panelWidth});
+    m_searchPanel->open(scope, replaceMode, m_filesTabWidget->selectedSearchText());
+}
+
+void IDEWindow::on_Find()
+{
+    showSearch(SearchScope::CurrentFile, false);
+}
+
+void IDEWindow::on_FindOpenFiles()
+{
+    showSearch(SearchScope::OpenFiles, false);
+}
+
+void IDEWindow::on_FindInProject()
+{
+    showSearch(SearchScope::Project, false);
+}
+
+void IDEWindow::on_Replace()
+{
+    showSearch(SearchScope::CurrentFile, true);
 }

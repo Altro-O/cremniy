@@ -1,13 +1,23 @@
 name: CI Build
 
 on:
-  push:
-    branches: [ main, master, develop ]
-  pull_request:
-    branches: [ main, master, develop ]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  workflow_dispatch:
+
+  push:
+    branches: [ main, dev ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/ci.yml'
+      
+  pull_request:
+    branches: [ main, dev ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -16,34 +26,129 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+      - name: configure Pagefile
+        if: runner.os == 'Windows'
+        uses: al-cheb/configure-pagefile-action@v1.5
         with:
-          version: '6.5.3'
-          cache: false
+          minimum-size: 8GB
+          disk-root: "D:"
+
+      - name: Set up Swap Space
+        if: runner.os == 'Linux'
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 8
+    
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Install Qt (Windows)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: 'win64_msvc2022_64'
+          cache: true
+      
+      - name: Install Qt (Linux)
+        if: runner.os == 'Linux'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          cache: true
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0
+          sudo apt-get install -y \
+            libgl1-mesa-dev libxkbcommon-x11-0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-xinerama0 libxcb-cursor0 \
+            libxcb-xkb1 libdbus-1-3
 
-      - name: Configure CMake
-        run: cmake -B build -S src -DCMAKE_BUILD_TYPE=Release
+      - name: Cache vcpkg binary archives (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/vcpkg/archives
+          key: vcpkg-archives-linux-libgit2-v1
+          restore-keys: |
+            vcpkg-archives-linux-
+
+      - name: Cache vcpkg binary archives (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
+          key: vcpkg-archives-windows-libgit2-v1
+          restore-keys: |
+            vcpkg-archives-windows-
+
+      - name: Setup vcpkg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install libgit2
+
+      - name: Setup vcpkg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          .\vcpkg\bootstrap-vcpkg.bat
+          .\vcpkg\vcpkg install libgit2:x64-windows
+
+      - name: Initialize MSVC Environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: |
+          chcp 65001
+          cmake -B build -S src `
+            -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+        run: |
+          cmake -B build -S src \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
-      - name: Test executable exists (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: test -f build/cremniy || test -f build/cremniy.app/Contents/MacOS/cremniy
+      - name: Test executable exists (Linux)
+        if: runner.os == 'Linux'
+        run: test -f build/cremniy
 
       - name: Test executable exists (Windows)
         if: runner.os == 'Windows'
-        run: Test-Path build/Release/cremniy.exe
+        shell: pwsh
+        run: |
+          if (!(Test-Path "build/cremniy.exe")) {
+            throw "build/cremniy.exe was not produced"
+          }

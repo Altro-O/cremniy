@@ -1,10 +1,18 @@
 <RCC>
     <qresource prefix="/">
-        <file>styles/style.qss</file>
-        <file>icons/icon.png</file>
-        <file>icons/binary.png</file>
-        <file>icons/dasm.png</file>
-        <file>icons/code.png</file>
-        <file>icons/close.png</file>
+        <file>data/instructions_ru.json</file>
+        <file>icons/close.svg</file>
+        <file>icons/code.svg</file>
+        <file>icons/binary.svg</file>
+        <file>icons/dasm.svg</file>
+        <file>icons/icon.svg</file>
+        <file>icons/welcome-caret-down.svg</file>
+        <file>icons/welcome-folder.svg</file>
+        <file>styles/base.qss</file>
+        <file>styles/dark.qss</file>
+        <file>styles/welcome.qss</file>
+        <file>fonts/JetBrainsMono-Italic.ttf</file>
+        <file>fonts/JetBrainsMono-Regular.ttf</file>
+        <file>fonts/JetBrainsMono-Bold.ttf</file>
     </qresource>
 </RCC>
